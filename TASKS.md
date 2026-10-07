@@ -13,10 +13,10 @@
 
 | 完了 | # | タスク | テスト（こうなればOK） |
 |---|---|---|---|
-| [ ] | 1 | Pythonをインストールする | `python --version` で `Python 3.x` と出る |
-| [ ] | 2 | プロジェクト専用の環境（仮想環境）を作る | ターミナルの左端に `(.venv)` と出る |
-| [ ] | 3 | Streamlitをインストールする | `streamlit hello` でブラウザにサンプル画面が出る |
-| [ ] | 4 | Gitに入れないファイルの一覧（`.gitignore`）を作る | `git status` に `.venv` が出てこない |
+| [x] | 1 | Pythonをインストールする | `python --version` で `Python 3.x` と出る |
+| [x] | 2 | プロジェクト専用の環境（仮想環境）を作る | ターミナルの左端に `(.venv)` と出る |
+| [x] | 3 | Streamlitをインストールする | `streamlit hello` でブラウザにサンプル画面が出る |
+| [x] | 4 | Gitに入れないファイルの一覧（`.gitignore`）を作る | `git status` に `.venv` が出てこない |
 | [ ] | 5 | AIのAPIキーを取得し、`.env` に保存する | `git status` に `.env` が出てこない（キーがGitHubに上がらない） |
 
 ## フェーズ1：画面を作る
