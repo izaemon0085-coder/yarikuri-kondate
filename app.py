@@ -13,6 +13,7 @@ dislikes = st.text_input("苦手な食材・アレルギー（例：えび、セ
 area = st.text_input("地域（例：東京都 世田谷区）")
 store = st.text_input("よく行くスーパー（例：〇〇ストア 駅前店）")
 sale_text = st.text_area("特売品（1行に1つ。例：豚こま 100g 98円）")
+period = st.radio("献立の期間", ["1日分", "1週間分"])
 
 sale_items = [line.strip() for line in sale_text.splitlines() if line.strip()]
 
@@ -23,7 +24,7 @@ if st.button("献立を作る"):
         sale_list = "  - なし"
 
     prompt = f"""あなたは、家庭料理と食費の節約が得意な献立アドバイザーです。
-次の条件で、1日分の献立（朝・昼・夜）を考えてください。
+次の条件で、{period}の献立（朝・昼・夜）を考えてください。
 
 - 人数：{people}人
 - 1か月の食費の予算：{budget}円
@@ -36,7 +37,10 @@ if st.button("献立を作る"):
 苦手な食材・アレルギーの食材は、絶対に使わないでください。
 特売品は、できるだけ使ってください。
 
-答えは、朝・昼・夜ごとに見出しをつけて、料理名と主な材料を短く書いてください。"""
+1週間分のときは、1日目〜7日目まで、毎日の献立を書いてください。
+同じ料理が続かないようにしてください。
+
+答えは、日ごとに見出しをつけて、朝・昼・夜の料理名と主な材料を短く書いてください。"""
 
     with st.expander("AIへのお願い文（確認用）"):
         st.text(prompt)
@@ -50,7 +54,7 @@ if st.button("献立を作る"):
             messages=[{"role": "user", "content": prompt}],
         )
 
-    st.subheader("1日分の献立")
+    st.subheader(f"{period}の献立")
     for block in response.content:
         if block.type == "text":
             st.markdown(block.text)
