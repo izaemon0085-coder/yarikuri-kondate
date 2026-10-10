@@ -1,3 +1,5 @@
+import re
+
 import anthropic
 import streamlit as st
 from dotenv import load_dotenv
@@ -59,4 +61,14 @@ if st.button("献立を作る"):
             fallbacks="default",
             messages=[{"role": "user", "content": prompt}],
         ) as stream:
-            st.write_stream(stream.text_stream)
+            menu_text = st.write_stream(stream.text_stream)
+
+    totals = re.findall(r"合計[:：]\s*約?([\d,]+)円", menu_text)
+    if totals:
+        total = int(totals[-1].replace(",", ""))
+        if total <= period_budget:
+            st.success(f"予算内です（合計 約{total:,}円 ／ 目安 {period_budget:,}円）")
+        else:
+            st.error(f"予算オーバーです（合計 約{total:,}円 ／ 目安 {period_budget:,}円）")
+    else:
+        st.warning("合計金額を読み取れませんでした")
