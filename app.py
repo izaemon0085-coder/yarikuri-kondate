@@ -1,6 +1,7 @@
 import datetime
 
 import anthropic
+import pandas as pd
 import streamlit as st
 from dotenv import load_dotenv
 from pydantic import BaseModel
@@ -103,5 +104,16 @@ if st.button("献立を作る"):
         st.warning("献立のデータを受け取れませんでした。もう一度試してください。")
         st.stop()
 
-    st.write(f"{len(plan.days)}日分のデータを受け取りました。")
-    st.json(plan.model_dump())
+    rows = []
+    for day in plan.days:
+        d = datetime.date.fromisoformat(day.date)
+        day_weekday = "月火水木金土日"[d.weekday()]
+        rows.append({
+            "日付": f"{d.month}/{d.day}({day_weekday})",
+            "朝": day.breakfast,
+            "昼": day.lunch,
+            "夜": day.dinner,
+            "食費": f"約{day.cost:,}円",
+        })
+
+    st.table(pd.DataFrame(rows).set_index("日付"))
