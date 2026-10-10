@@ -1,4 +1,9 @@
+import anthropic
 import streamlit as st
+from dotenv import load_dotenv
+
+load_dotenv()
+client = anthropic.Anthropic()
 
 st.title("やりくり献立")
 
@@ -29,7 +34,23 @@ if st.button("献立を作る"):
 {sale_list}
 
 苦手な食材・アレルギーの食材は、絶対に使わないでください。
-特売品は、できるだけ使ってください。"""
+特売品は、できるだけ使ってください。
 
-    st.subheader("AIへのお願い文（確認用）")
-    st.text(prompt)
+答えは、朝・昼・夜ごとに見出しをつけて、料理名と主な材料を短く書いてください。"""
+
+    with st.expander("AIへのお願い文（確認用）"):
+        st.text(prompt)
+
+    with st.spinner("AIが献立を考えています…"):
+        response = client.beta.messages.create(
+            model="claude-opus-5-5",
+            max_tokens=16000,
+            betas=["server-side-fallback-2026-07-01"],
+            fallbacks="default",
+            messages=[{"role": "user", "content": prompt}],
+        )
+
+    st.subheader("1日分の献立")
+    for block in response.content:
+        if block.type == "text":
+            st.markdown(block.text)
