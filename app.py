@@ -1,12 +1,25 @@
 import datetime
-import re
 
 import anthropic
 import streamlit as st
 from dotenv import load_dotenv
+from pydantic import BaseModel
 
 load_dotenv()
 client = anthropic.Anthropic()
+
+
+class DayMenu(BaseModel):
+    date: str
+    breakfast: str
+    lunch: str
+    dinner: str
+    cost: int
+
+
+class MenuPlan(BaseModel):
+    days: list[DayMenu]
+
 
 st.title("やりくり献立")
 
@@ -52,12 +65,14 @@ if st.button("献立を作る"):
 苦手な食材・アレルギーの食材は、絶対に使わないでください。
 特売品は、できるだけ使ってください。
 
-1週間分のときは1日目〜7日目まで、1か月分のときは1日目〜30日目まで、毎日の献立を書いてください。
-同じ料理が続かないようにしてください。
+{days}日分すべての献立を、同じ料理が続かないように考えてください。
 
-答えは、日ごとに見出しをつけて、朝・昼・夜の料理名と主な材料を短く書いてください。
-各日の最後に「この日の食費：約○○円」と書いてください。
-一番最後に「合計：約○○円」と1行で書いてください。"""
+1日ごとに、次の5つを答えてください。
+- date：日付（例：2026-10-12）
+- breakfast：朝の料理名（主な材料をかっこで短く）
+- lunch：昼の料理名（主な材料をかっこで短く）
+- dinner：夜の料理名（主な材料をかっこで短く）
+- cost：その日の食費の目安（円、数字だけ）"""
 
     with st.expander("AIへのお願い文（確認用）"):
         st.text(prompt)
@@ -71,8 +86,9 @@ if st.button("献立を作る"):
                 betas=["server-side-fallback-2026-07-01"],
                 fallbacks="default",
                 messages=[{"role": "user", "content": prompt}],
+                output_format=MenuPlan,
             ) as stream:
-                menu_text = st.write_stream(stream.text_stream)
+                plan = stream.get_final_message().parsed_output
         except anthropic.AuthenticationError:
             st.error("APIキーが正しくないか、期限が切れています。.env を確認してください。")
             st.stop()
@@ -83,12 +99,9 @@ if st.button("献立を作る"):
             st.error(f"AIでエラーが起きました（{e.status_code}）。少し待ってから、もう一度試してください。")
             st.stop()
 
-    totals = re.findall(r"合計[:：]\s*約?([\d,]+)円", menu_text)
-    if totals:
-        total = int(totals[-1].replace(",", ""))
-        if total <= period_budget:
-            st.success(f"予算内です（合計 約{total:,}円 ／ 目安 {period_budget:,}円）")
-        else:
-            st.error(f"予算オーバーです（合計 約{total:,}円 ／ 目安 {period_budget:,}円）")
-    else:
-        st.warning("合計金額を読み取れませんでした")
+    if plan is None:
+        st.warning("献立のデータを受け取れませんでした。もう一度試してください。")
+        st.stop()
+
+    st.write(f"{len(plan.days)}日分のデータを受け取りました。")
+    st.json(plan.model_dump())
