@@ -19,3 +19,6 @@ st.write("スーパー：", store)
 st.write("特売品：", len(sale_items), "件")
 for item in sale_items:
     st.write("・", item)
+
+if st.button("献立を作る"):
+    st.write("ボタンが押されました")
