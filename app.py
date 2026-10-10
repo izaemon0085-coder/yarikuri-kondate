@@ -67,6 +67,9 @@ if st.button("献立を作る"):
 特売品は、できるだけ使ってください。
 
 {days}日分すべての献立を、同じ料理が続かないように考えてください。
+できるだけ予算内に収まるように、料理や材料を工夫してください。
+食費は、実際のスーパーの値段に近い金額にしてください。
+予算が足りないときも、金額を小さく書かずに、正直な金額を書いてください。
 
 1日ごとに、次の5つを答えてください。
 - date：日付（例：2026-10-12）
@@ -115,6 +118,12 @@ if st.button("献立を作る"):
             "夜": day.dinner,
             "食費": f"約{day.cost:,}円",
         })
+
+    total = sum(day.cost for day in plan.days)
+    if total <= period_budget:
+        st.success(f"予算内です（合計 約{total:,}円 ／ 目安 {period_budget:,}円）")
+    else:
+        st.error(f"予算オーバーです（合計 約{total:,}円 ／ 目安 {period_budget:,}円）")
 
     weeks = [rows[i:i + 7] for i in range(0, len(rows), 7)]
     tab_names = [f"第{n}週（{week[0]['日付']}〜）" for n, week in enumerate(weeks, start=1)]
