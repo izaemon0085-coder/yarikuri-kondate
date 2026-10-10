@@ -9,8 +9,8 @@ client = anthropic.Anthropic()
 
 st.title("やりくり献立")
 
-people = st.number_input("人数", min_value=1, max_value=10, value=2)
-budget = st.number_input("1か月の食費の予算（円）", min_value=0, step=1000, value=50000)
+people = st.number_input("人数", min_value=1, max_value=10, value=None, placeholder="例：2")
+budget = st.number_input("1か月の食費の予算（円）", min_value=0, step=1000, value=None, placeholder="例：50000")
 dislikes = st.text_input("苦手な食材・アレルギー（例：えび、セロリ）")
 area = st.text_input("地域（例：東京都 世田谷区）")
 store = st.text_input("よく行くスーパー（例：〇〇ストア 駅前店）")
@@ -20,9 +20,14 @@ period = st.radio("献立の期間", ["1日分", "1週間分", "1か月分"])
 sale_items = [line.strip() for line in sale_text.splitlines() if line.strip()]
 
 days = {"1日分": 1, "1週間分": 7, "1か月分": 30}[period]
-period_budget = budget * days // 30
 
 if st.button("献立を作る"):
+    if people is None or not budget:
+        st.warning("人数と1か月の食費の予算を入力してください。")
+        st.stop()
+
+    period_budget = budget * days // 30
+
     if sale_items:
         sale_list = "\n".join("  - " + item for item in sale_items)
     else:
@@ -54,14 +59,24 @@ if st.button("献立を作る"):
 
     st.subheader(f"{period}の献立")
     with st.spinner("AIが献立を考えています…"):
-        with client.beta.messages.stream(
-            model="claude-opus-5-5",
-            max_tokens=64000,
-            betas=["server-side-fallback-2026-07-01"],
-            fallbacks="default",
-            messages=[{"role": "user", "content": prompt}],
-        ) as stream:
-            menu_text = st.write_stream(stream.text_stream)
+        try:
+            with client.beta.messages.stream(
+                model="claude-opus-5-5",
+                max_tokens=64000,
+                betas=["server-side-fallback-2026-07-01"],
+                fallbacks="default",
+                messages=[{"role": "user", "content": prompt}],
+            ) as stream:
+                menu_text = st.write_stream(stream.text_stream)
+        except anthropic.AuthenticationError:
+            st.error("APIキーが正しくないか、期限が切れています。.env を確認してください。")
+            st.stop()
+        except anthropic.APIConnectionError:
+            st.error("インターネットに接続できませんでした。接続を確認してください。")
+            st.stop()
+        except anthropic.APIStatusError as e:
+            st.error(f"AIでエラーが起きました（{e.status_code}）。少し待ってから、もう一度試してください。")
+            st.stop()
 
     totals = re.findall(r"合計[:：]\s*約?([\d,]+)円", menu_text)
     if totals:
