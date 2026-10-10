@@ -116,4 +116,9 @@ if st.button("献立を作る"):
             "食費": f"約{day.cost:,}円",
         })
 
-    st.table(pd.DataFrame(rows).set_index("日付"))
+    weeks = [rows[i:i + 7] for i in range(0, len(rows), 7)]
+    tab_names = [f"第{n}週（{week[0]['日付']}〜）" for n, week in enumerate(weeks, start=1)]
+    tabs = st.tabs(tab_names)
+    for tab, week in zip(tabs, weeks):
+        with tab:
+            st.table(pd.DataFrame(week).set_index("日付"))
