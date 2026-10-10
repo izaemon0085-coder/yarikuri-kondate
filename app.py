@@ -13,7 +13,7 @@ dislikes = st.text_input("苦手な食材・アレルギー（例：えび、セ
 area = st.text_input("地域（例：東京都 世田谷区）")
 store = st.text_input("よく行くスーパー（例：〇〇ストア 駅前店）")
 sale_text = st.text_area("特売品（1行に1つ。例：豚こま 100g 98円）")
-period = st.radio("献立の期間", ["1日分", "1週間分"])
+period = st.radio("献立の期間", ["1日分", "1週間分", "1か月分"])
 
 sale_items = [line.strip() for line in sale_text.splitlines() if line.strip()]
 
@@ -37,7 +37,7 @@ if st.button("献立を作る"):
 苦手な食材・アレルギーの食材は、絶対に使わないでください。
 特売品は、できるだけ使ってください。
 
-1週間分のときは、1日目〜7日目まで、毎日の献立を書いてください。
+1週間分のときは1日目〜7日目まで、1か月分のときは1日目〜30日目まで、毎日の献立を書いてください。
 同じ料理が続かないようにしてください。
 
 答えは、日ごとに見出しをつけて、朝・昼・夜の料理名と主な材料を短く書いてください。"""
@@ -45,16 +45,13 @@ if st.button("献立を作る"):
     with st.expander("AIへのお願い文（確認用）"):
         st.text(prompt)
 
+    st.subheader(f"{period}の献立")
     with st.spinner("AIが献立を考えています…"):
-        response = client.beta.messages.create(
+        with client.beta.messages.stream(
             model="claude-opus-5-5",
-            max_tokens=16000,
+            max_tokens=64000,
             betas=["server-side-fallback-2026-07-01"],
             fallbacks="default",
             messages=[{"role": "user", "content": prompt}],
-        )
-
-    st.subheader(f"{period}の献立")
-    for block in response.content:
-        if block.type == "text":
-            st.markdown(block.text)
+        ) as stream:
+            st.write_stream(stream.text_stream)
