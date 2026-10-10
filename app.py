@@ -17,6 +17,9 @@ period = st.radio("献立の期間", ["1日分", "1週間分", "1か月分"])
 
 sale_items = [line.strip() for line in sale_text.splitlines() if line.strip()]
 
+days = {"1日分": 1, "1週間分": 7, "1か月分": 30}[period]
+period_budget = budget * days // 30
+
 if st.button("献立を作る"):
     if sale_items:
         sale_list = "\n".join("  - " + item for item in sale_items)
@@ -27,7 +30,7 @@ if st.button("献立を作る"):
 次の条件で、{period}の献立（朝・昼・夜）を考えてください。
 
 - 人数：{people}人
-- 1か月の食費の予算：{budget}円
+- 1か月の食費の予算：{budget}円（{period}の目安：{period_budget}円）
 - 苦手な食材・アレルギー：{dislikes or "なし"}
 - 地域：{area or "指定なし"}
 - よく行くスーパー：{store or "指定なし"}
@@ -40,7 +43,9 @@ if st.button("献立を作る"):
 1週間分のときは1日目〜7日目まで、1か月分のときは1日目〜30日目まで、毎日の献立を書いてください。
 同じ料理が続かないようにしてください。
 
-答えは、日ごとに見出しをつけて、朝・昼・夜の料理名と主な材料を短く書いてください。"""
+答えは、日ごとに見出しをつけて、朝・昼・夜の料理名と主な材料を短く書いてください。
+各日の最後に「この日の食費：約○○円」と書いてください。
+一番最後に「合計：約○○円」と1行で書いてください。"""
 
     with st.expander("AIへのお願い文（確認用）"):
         st.text(prompt)
