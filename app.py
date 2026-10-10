@@ -1,3 +1,4 @@
+import datetime
 import re
 
 import anthropic
@@ -16,6 +17,7 @@ area = st.text_input("地域（例：東京都 世田谷区）")
 store = st.text_input("よく行くスーパー（例：〇〇ストア 駅前店）")
 sale_text = st.text_area("特売品（1行に1つ。例：豚こま 100g 98円）")
 period = st.radio("献立の期間", ["1日分", "1週間分", "1か月分"])
+start_date = st.date_input("献立を始める日", value=datetime.date.today())
 
 sale_items = [line.strip() for line in sale_text.splitlines() if line.strip()]
 
@@ -27,6 +29,8 @@ if st.button("献立を作る"):
         st.stop()
 
     period_budget = budget * days // 30
+    weekday = "月火水木金土日"[start_date.weekday()]
+    start_text = f"{start_date.year}年{start_date.month}月{start_date.day}日（{weekday}）"
 
     if sale_items:
         sale_list = "\n".join("  - " + item for item in sale_items)
@@ -35,6 +39,7 @@ if st.button("献立を作る"):
 
     prompt = f"""あなたは、家庭料理と食費の節約が得意な献立アドバイザーです。
 次の条件で、{period}の献立（朝・昼・夜）を考えてください。
+献立は、{start_text}から始めてください。
 
 - 人数：{people}人
 - 1か月の食費の予算：{budget}円（{period}の目安：{period_budget}円）
