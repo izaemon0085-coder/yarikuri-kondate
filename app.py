@@ -78,9 +78,12 @@ if flyer is not None:
         for item in result.items:
             parts = [item.name, item.amount, f"{item.price}円"]
             lines.append(" ".join(part for part in parts if part))
-        st.text("\n".join(lines))
+        current = st.session_state.get("sale_text", "").strip()
+        new_text = "\n".join(lines)
+        st.session_state["sale_text"] = f"{current}\n{new_text}" if current else new_text
+        st.success(f"{len(lines)}件の特売品を、特売品の欄に入れました。")
 
-sale_text = st.text_area("特売品（1行に1つ。例：豚こま 100g 98円）")
+sale_text = st.text_area("特売品（1行に1つ。例：豚こま 100g 98円）", key="sale_text")
 period = st.radio("献立の期間", ["1日分", "1週間分", "1か月分"])
 start_date = st.date_input("献立を始める日", value=datetime.date.today())
 
