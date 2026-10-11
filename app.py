@@ -1,9 +1,12 @@
+import base64
 import datetime
+import io
 
 import anthropic
 import pandas as pd
 import streamlit as st
 from dotenv import load_dotenv
+from PIL import Image
 from pydantic import BaseModel
 
 load_dotenv()
@@ -32,6 +35,36 @@ store = st.text_input("よく行くスーパー（例：〇〇ストア 駅前�
 flyer = st.file_uploader("チラシの写真（JPG・PNG）", type=["jpg", "jpeg", "png"])
 if flyer is not None:
     st.image(flyer, caption=flyer.name, width=300)
+
+    if st.button("チラシを読み取る"):
+        image = Image.open(flyer).convert("RGB")
+        image.thumbnail((2000, 2000))
+        buffer = io.BytesIO()
+        image.save(buffer, format="JPEG", quality=90)
+        image_data = base64.standard_b64encode(buffer.getvalue()).decode("utf-8")
+
+        with st.spinner("AIがチラシを読んでいます…"):
+            try:
+                response = client.beta.messages.create(
+                    model="claude-opus-5-5",
+                    max_tokens=16000,
+                    betas=["server-side-fallback-2026-07-01"],
+                    fallbacks="default",
+                    messages=[{
+                        "role": "user",
+                        "content": [
+                            {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": image_data}},
+                            {"type": "text", "text": "このチラシに載っている特売品の、商品名と値段を一覧にしてください。"},
+                        ],
+                    }],
+                )
+            except anthropic.APIError:
+                st.error("チラシを読み取れませんでした。少し待ってから、もう一度試してください。")
+                st.stop()
+
+        for block in response.content:
+            if block.type == "text":
+                st.markdown(block.text)
 
 sale_text = st.text_area("特売品（1行に1つ。例：豚こま 100g 98円）")
 period = st.radio("献立の期間", ["1日分", "1週間分", "1か月分"])
