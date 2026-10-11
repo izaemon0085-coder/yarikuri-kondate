@@ -64,7 +64,7 @@ if flyer is not None:
                         "role": "user",
                         "content": [
                             {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": image_data}},
-                            {"type": "text", "text": "このチラシに載っている特売品を、1つずつ答えてください。name は商品名、amount は量（例：100g、1玉、10個入り。わからないときは空）、price は値段（円、数字だけ）です。"},
+                            {"type": "text", "text": "このチラシに載っている特売品を、1つずつ答えてください。name は商品名、amount は量（例：100g、1玉、10個入り。わからないときは空）、price は値段（円、数字だけ）です。チラシではない写真や、特売品が見つからないときは、items を空にしてください。"},
                         ],
                     }],
                     output_format=SaleList,
@@ -74,14 +74,17 @@ if flyer is not None:
                 st.stop()
 
         result = response.parsed_output
-        lines = []
-        for item in result.items:
-            parts = [item.name, item.amount, f"{item.price}円"]
-            lines.append(" ".join(part for part in parts if part))
-        current = st.session_state.get("sale_text", "").strip()
-        new_text = "\n".join(lines)
-        st.session_state["sale_text"] = f"{current}\n{new_text}" if current else new_text
-        st.success(f"{len(lines)}件の特売品を、特売品の欄に入れました。")
+        if result is None or not result.items:
+            st.warning("特売品が見つかりませんでした。スーパーのチラシの写真か確認してください。")
+        else:
+            lines = []
+            for item in result.items:
+                parts = [item.name, item.amount, f"{item.price}円"]
+                lines.append(" ".join(part for part in parts if part))
+            current = st.session_state.get("sale_text", "").strip()
+            new_text = "\n".join(lines)
+            st.session_state["sale_text"] = f"{current}\n{new_text}" if current else new_text
+            st.success(f"{len(lines)}件の特売品を、特売品の欄に入れました。")
 
 sale_text = st.text_area("特売品（1行に1つ。例：豚こま 100g 98円）", key="sale_text")
 period = st.radio("献立の期間", ["1日分", "1週間分", "1か月分"])
