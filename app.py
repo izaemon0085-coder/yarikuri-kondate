@@ -29,6 +29,10 @@ budget = st.number_input("1か月の食費の予算（円）", min_value=0, step
 dislikes = st.text_input("苦手な食材・アレルギー（例：えび、セロリ）")
 area = st.text_input("地域（例：東京都 世田谷区）")
 store = st.text_input("よく行くスーパー（例：〇〇ストア 駅前店）")
+flyer = st.file_uploader("チラシの写真（JPG・PNG）", type=["jpg", "jpeg", "png"])
+if flyer is not None:
+    st.image(flyer, caption=flyer.name, width=300)
+
 sale_text = st.text_area("特売品（1行に1つ。例：豚こま 100g 98円）")
 period = st.radio("献立の期間", ["1日分", "1週間分", "1か月分"])
 start_date = st.date_input("献立を始める日", value=datetime.date.today())
