@@ -35,61 +35,65 @@ class SaleList(BaseModel):
     items: list[SaleItem]
 
 
+def read_flyer(file):
+    image = Image.open(file).convert("RGB")
+    image.thumbnail((2000, 2000))
+    buffer = io.BytesIO()
+    image.save(buffer, format="JPEG", quality=90)
+    image_data = base64.standard_b64encode(buffer.getvalue()).decode("utf-8")
+
+    response = client.beta.messages.parse(
+        model="claude-opus-5-5",
+        max_tokens=16000,
+        betas=["server-side-fallback-2026-07-01"],
+        fallbacks="default",
+        messages=[{
+            "role": "user",
+            "content": [
+                {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": image_data}},
+                {"type": "text", "text": "このチラシに載っている特売品を、1つずつ答えてください。name は商品名、amount は量（例：100g、1玉、10個入り。わからないときは空）、price は値段（円、数字だけ）です。チラシではない写真や、特売品が見つからないときは、items を空にしてください。"},
+            ],
+        }],
+        output_format=SaleList,
+    )
+    result = response.parsed_output
+    if result is None:
+        return []
+    lines = []
+    for item in result.items:
+        parts = [item.name, item.amount, f"{item.price}円"]
+        lines.append(" ".join(part for part in parts if part))
+    return lines
+
+
 st.title("やりくり献立")
 
 people = st.number_input("人数", min_value=1, max_value=10, value=None, placeholder="例：2")
 budget = st.number_input("1か月の食費の予算（円）", min_value=0, step=1000, value=None, placeholder="例：50000")
 dislikes = st.text_input("苦手な食材・アレルギー（例：えび、セロリ）")
 area = st.text_input("地域（例：東京都 世田谷区）")
-flyer = st.file_uploader("チラシの写真（JPG・PNG）※読み取った特売品は、お店1の欄に入ります", type=["jpg", "jpeg", "png"])
-if flyer is not None:
-    st.image(flyer, caption=flyer.name, width=300)
-
-    if st.button("チラシを読み取る"):
-        image = Image.open(flyer).convert("RGB")
-        image.thumbnail((2000, 2000))
-        buffer = io.BytesIO()
-        image.save(buffer, format="JPEG", quality=90)
-        image_data = base64.standard_b64encode(buffer.getvalue()).decode("utf-8")
-
-        with st.spinner("AIがチラシを読んでいます…"):
-            try:
-                response = client.beta.messages.parse(
-                    model="claude-opus-5-5",
-                    max_tokens=16000,
-                    betas=["server-side-fallback-2026-07-01"],
-                    fallbacks="default",
-                    messages=[{
-                        "role": "user",
-                        "content": [
-                            {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": image_data}},
-                            {"type": "text", "text": "このチラシに載っている特売品を、1つずつ答えてください。name は商品名、amount は量（例：100g、1玉、10個入り。わからないときは空）、price は値段（円、数字だけ）です。チラシではない写真や、特売品が見つからないときは、items を空にしてください。"},
-                        ],
-                    }],
-                    output_format=SaleList,
-                )
-            except anthropic.APIError:
-                st.error("チラシを読み取れませんでした。少し待ってから、もう一度試してください。")
-                st.stop()
-
-        result = response.parsed_output
-        if result is None or not result.items:
-            st.warning("特売品が見つかりませんでした。スーパーのチラシの写真か確認してください。")
-        else:
-            lines = []
-            for item in result.items:
-                parts = [item.name, item.amount, f"{item.price}円"]
-                lines.append(" ".join(part for part in parts if part))
-            current = st.session_state.get("sale_text_1", "").strip()
-            new_text = "\n".join(lines)
-            st.session_state["sale_text_1"] = f"{current}\n{new_text}" if current else new_text
-            st.success(f"{len(lines)}件の特売品を、お店1の特売品の欄に入れました。")
-
 store_count = st.number_input("よく行くお店の数", min_value=1, max_value=3, value=2)
 stores = []
 for i in range(1, store_count + 1):
     with st.container(border=True):
         name = st.text_input(f"お店{i}の名前（例：〇〇ストア 駅前店）", key=f"store_name_{i}")
+        flyer = st.file_uploader(f"お店{i}のチラシの写真（JPG・PNG）", type=["jpg", "jpeg", "png"], key=f"flyer_{i}")
+        if flyer is not None:
+            st.image(flyer, caption=flyer.name, width=300)
+            if st.button(f"お店{i}のチラシを読み取る", key=f"read_{i}"):
+                with st.spinner("AIがチラシを読んでいます…"):
+                    try:
+                        lines = read_flyer(flyer)
+                    except anthropic.APIError:
+                        lines = None
+                        st.error("チラシを読み取れませんでした。少し待ってから、もう一度試してください。")
+                if lines == []:
+                    st.warning("特売品が見つかりませんでした。スーパーのチラシの写真か確認してください。")
+                elif lines:
+                    current = st.session_state.get(f"sale_text_{i}", "").strip()
+                    new_text = "\n".join(lines)
+                    st.session_state[f"sale_text_{i}"] = f"{current}\n{new_text}" if current else new_text
+                    st.success(f"{len(lines)}件の特売品を、お店{i}の特売品の欄に入れました。")
         text = st.text_area(f"お店{i}の特売品（1行に1つ。例：豚こま 100g 98円）", key=f"sale_text_{i}")
     items = [line.strip() for line in text.splitlines() if line.strip()]
     stores.append({"name": name or f"お店{i}", "items": items})
