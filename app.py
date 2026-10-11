@@ -25,6 +25,16 @@ class MenuPlan(BaseModel):
     days: list[DayMenu]
 
 
+class SaleItem(BaseModel):
+    name: str
+    amount: str
+    price: int
+
+
+class SaleList(BaseModel):
+    items: list[SaleItem]
+
+
 st.title("やりくり献立")
 
 people = st.number_input("人数", min_value=1, max_value=10, value=None, placeholder="例：2")
@@ -45,7 +55,7 @@ if flyer is not None:
 
         with st.spinner("AIがチラシを読んでいます…"):
             try:
-                response = client.beta.messages.create(
+                response = client.beta.messages.parse(
                     model="claude-opus-5-5",
                     max_tokens=16000,
                     betas=["server-side-fallback-2026-07-01"],
@@ -54,17 +64,21 @@ if flyer is not None:
                         "role": "user",
                         "content": [
                             {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": image_data}},
-                            {"type": "text", "text": "このチラシに載っている特売品の、商品名と値段を一覧にしてください。"},
+                            {"type": "text", "text": "このチラシに載っている特売品を、1つずつ答えてください。name は商品名、amount は量（例：100g、1玉、10個入り。わからないときは空）、price は値段（円、数字だけ）です。"},
                         ],
                     }],
+                    output_format=SaleList,
                 )
             except anthropic.APIError:
                 st.error("チラシを読み取れませんでした。少し待ってから、もう一度試してください。")
                 st.stop()
 
-        for block in response.content:
-            if block.type == "text":
-                st.markdown(block.text)
+        result = response.parsed_output
+        lines = []
+        for item in result.items:
+            parts = [item.name, item.amount, f"{item.price}円"]
+            lines.append(" ".join(part for part in parts if part))
+        st.text("\n".join(lines))
 
 sale_text = st.text_area("特売品（1行に1つ。例：豚こま 100g 98円）")
 period = st.radio("献立の期間", ["1日分", "1週間分", "1か月分"])
