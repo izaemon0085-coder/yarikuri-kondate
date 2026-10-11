@@ -21,8 +21,15 @@ class DayMenu(BaseModel):
     cost: int
 
 
+class ShoppingItem(BaseModel):
+    store: str
+    item: str
+    reason: str
+
+
 class MenuPlan(BaseModel):
     days: list[DayMenu]
+    shopping: list[ShoppingItem]
 
 
 class SaleItem(BaseModel):
@@ -144,7 +151,14 @@ if st.button("献立を作る"):
 - breakfast：朝の料理名（主な材料をかっこで短く）
 - lunch：昼の料理名（主な材料をかっこで短く）
 - dinner：夜の料理名（主な材料をかっこで短く）
-- cost：その日の食費の目安（円、数字だけ）"""
+- cost：その日の食費の目安（円、数字だけ）
+
+さらに、献立に使う主な食材を、どのお店で買うと安いかを考えて、shopping に入れてください。
+同じ商品が2つ以上のお店の特売品にあるときは、安いほうのお店にしてください。
+特売品にない食材は、よく行くお店のどれかにしてください。
+- store：お店の名前（上に書いたお店の名前のどれか）
+- item：買うもの（量もあれば短く）
+- reason：そのお店にした理由（例：88円で一番安い）"""
 
     with st.expander("AIへのお願い文（確認用）"):
         st.text(prompt)
@@ -199,3 +213,7 @@ if st.button("献立を作る"):
     for tab, week in zip(tabs, weeks):
         with tab:
             st.table(pd.DataFrame(week).set_index("日付"))
+
+    st.subheader("どのお店で何を買うと安いか")
+    shopping_rows = [{"お店": s.store, "買うもの": s.item, "理由": s.reason} for s in plan.shopping]
+    st.table(pd.DataFrame(shopping_rows).set_index("お店"))
