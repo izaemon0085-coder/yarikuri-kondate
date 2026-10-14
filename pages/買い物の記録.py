@@ -46,12 +46,15 @@ def read_receipt(file):
             "role": "user",
             "content": [
                 {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": image_data}},
-                {"type": "text", "text": "このレシートを読んでください。date は買った日（例：2026-10-14。わからないときは空）、store はお店の名前、items は買った商品です。商品ごとに、name は商品名、reading は商品名のよみがな（ひらがな）、price は値段（円、数字だけ）、category は区分です。区分は、料理に使うものは「食材」、お茶・ジュース・水などは「飲み物」（牛乳は料理にも使うので「食材」）、ビール・酒は「お酒」、おやつは「お菓子」、洗剤・ティッシュなどは「日用品」、どれにも当てはまらないものは「その他」にしてください。値引きがあるときは、値引きしたあとの値段にしてください。小計・合計・消費税・お預り・お釣りは items に入れないでください。"},
+                {"type": "text", "text": "このレシートを読んでください。date は買った日（例：2026-10-14。わからないときは空）、store はお店の名前、items は買った商品です。商品ごとに、name は商品名、reading は商品名のよみがな（ひらがな）、price は値段（円、数字だけ）、category は区分です。区分は、料理に使うものは「食材」、お茶・ジュース・水などは「飲み物」（牛乳は料理にも使うので「食材」）、ビール・酒は「お酒」、おやつは「お菓子」、洗剤・ティッシュなどは「日用品」、どれにも当てはまらないものは「その他」にしてください。値引きがあるときは、値引きしたあとの値段にしてください。小計・合計・消費税・お預り・お釣りは items に入れないでください。レシートではない写真や、商品が見つからないときは、items を空にしてください。"},
             ],
         }],
         output_format=Receipt,
     )
-    return response.parsed_output
+    result = response.parsed_output
+    if result is None:
+        return Receipt(date="", store="", items=[])
+    return result
 
 
 def sort_rows(rows, order, category_order):
@@ -80,7 +83,10 @@ if receipt is not None:
             except anthropic.APIError:
                 result = None
                 st.error("レシートを読み取れませんでした。少し待ってから、もう一度試してください。")
-        if result is not None:
+        if result is not None and not result.items:
+            st.session_state.pop("receipt_rows", None)
+            st.warning("レシートが見つかりませんでした。お店のレシートの写真か確認してください。")
+        elif result is not None:
             try:
                 st.session_state["receipt_date"] = datetime.date.fromisoformat(result.date)
             except ValueError:
