@@ -1,4 +1,5 @@
 import base64
+import datetime
 import io
 from typing import Literal
 
@@ -11,6 +12,8 @@ from pydantic import BaseModel
 
 load_dotenv()
 client = anthropic.Anthropic()
+
+CATEGORIES = ["食材", "飲み物", "お酒", "お菓子", "日用品", "その他"]
 
 
 class ReceiptItem(BaseModel):
@@ -64,6 +67,26 @@ if receipt is not None:
                 result = None
                 st.error("レシートを読み取れませんでした。少し待ってから、もう一度試してください。")
         if result is not None:
-            st.write(f"日付：{result.date}　お店：{result.store}")
+            try:
+                st.session_state["receipt_date"] = datetime.date.fromisoformat(result.date)
+            except ValueError:
+                st.session_state["receipt_date"] = datetime.date.today()
+            st.session_state["receipt_store"] = result.store
             rows = [{"区分": item.category, "商品": item.name, "よみがな": item.reading, "値段": item.price} for item in result.items]
-            st.table(pd.DataFrame(rows))
+            st.session_state["receipt_rows"] = pd.DataFrame(rows)
+            st.session_state.pop("receipt_editor", None)
+
+if "receipt_rows" in st.session_state:
+    st.subheader("読み取った結果（直せます）")
+    st.date_input("日付", key="receipt_date")
+    st.text_input("お店", key="receipt_store")
+    edited = st.data_editor(
+        st.session_state["receipt_rows"],
+        column_config={
+            "区分": st.column_config.SelectboxColumn("区分", options=CATEGORIES, required=True),
+            "値段": st.column_config.NumberColumn("値段", min_value=0, step=1, format="%d円"),
+        },
+        hide_index=True,
+        key="receipt_editor",
+    )
+    st.write(f"合計：{edited['値段'].sum():,}円")
