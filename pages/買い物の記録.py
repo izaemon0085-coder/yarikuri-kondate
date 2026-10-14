@@ -14,6 +14,7 @@ load_dotenv()
 client = anthropic.Anthropic()
 
 CATEGORIES = ["食材", "飲み物", "お酒", "お菓子", "日用品", "その他"]
+SORT_ORDERS = ["レシートの順", "あいうえお順", "区分ごと", "値段の高い順", "値段の安い順"]
 
 
 class ReceiptItem(BaseModel):
@@ -53,6 +54,19 @@ def read_receipt(file):
     return response.parsed_output
 
 
+def sort_rows(rows, order):
+    rows = rows.sort_values("順番")
+    if order == "あいうえお順":
+        return rows.sort_values("よみがな", kind="stable")
+    if order == "区分ごと":
+        return rows.sort_values("区分", key=lambda column: column.map(CATEGORIES.index), kind="stable")
+    if order == "値段の高い順":
+        return rows.sort_values("値段", ascending=False, kind="stable")
+    if order == "値段の安い順":
+        return rows.sort_values("値段", kind="stable")
+    return rows
+
+
 st.title("買い物の記録")
 st.write("ここで、レシートの読み取りや、買い物の記録をします。")
 
@@ -72,21 +86,30 @@ if receipt is not None:
             except ValueError:
                 st.session_state["receipt_date"] = datetime.date.today()
             st.session_state["receipt_store"] = result.store
-            rows = [{"区分": item.category, "商品": item.name, "よみがな": item.reading, "値段": item.price} for item in result.items]
+            rows = [{"順番": number, "区分": item.category, "商品": item.name, "よみがな": item.reading, "値段": item.price} for number, item in enumerate(result.items, start=1)]
             st.session_state["receipt_rows"] = pd.DataFrame(rows)
-            st.session_state.pop("receipt_editor", None)
+            st.session_state["editor_version"] = st.session_state.get("editor_version", 0) + 1
 
 if "receipt_rows" in st.session_state:
     st.subheader("読み取った結果（直せます）")
     st.date_input("日付", key="receipt_date")
     st.text_input("お店", key="receipt_store")
+    order = st.selectbox("並べ方", SORT_ORDERS)
+    rows = sort_rows(st.session_state["receipt_rows"], order)
+    editor_key = f"receipt_editor_{st.session_state['editor_version']}"
     edited = st.data_editor(
-        st.session_state["receipt_rows"],
+        rows,
         column_config={
             "区分": st.column_config.SelectboxColumn("区分", options=CATEGORIES, required=True),
             "値段": st.column_config.NumberColumn("値段", min_value=0, step=1, format="%d円"),
         },
+        column_order=["区分", "商品", "よみがな", "値段"],
         hide_index=True,
-        key="receipt_editor",
+        key=editor_key,
     )
+    changes = st.session_state[editor_key]
+    if changes["edited_rows"]:
+        st.session_state["receipt_rows"] = edited
+        st.session_state["editor_version"] += 1
+        st.rerun()
     st.write(f"合計：{edited['値段'].sum():,}円")
