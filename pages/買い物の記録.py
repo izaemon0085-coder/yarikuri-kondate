@@ -1,6 +1,7 @@
 import base64
 import datetime
 import io
+from pathlib import Path
 from typing import Literal
 
 import anthropic
@@ -16,6 +17,7 @@ client = anthropic.Anthropic()
 CATEGORIES = ["食材", "飲み物", "お酒", "お菓子", "日用品", "その他"]
 SORT_ORDERS = ["レシートの順", "あいうえお順", "区分ごと", "値段の高い順", "値段の安い順"]
 COLUMNS = ["順番", "区分", "商品", "よみがな", "値段"]
+RECORD_FILE = Path(__file__).parent.parent / "kaimono.csv"
 
 
 class ReceiptItem(BaseModel):
@@ -90,8 +92,31 @@ def fill_new_rows(rows):
     return rows
 
 
+def load_records():
+    if RECORD_FILE.exists():
+        return pd.read_csv(RECORD_FILE)
+    return pd.DataFrame(columns=["日付", "お店", "区分", "商品", "よみがな", "値段"])
+
+
+def save_records(date, store, rows):
+    rows = rows.sort_values("順番")
+    new_records = pd.DataFrame({
+        "日付": date.isoformat(),
+        "お店": store,
+        "区分": rows["区分"],
+        "商品": rows["商品"],
+        "よみがな": rows["よみがな"],
+        "値段": rows["値段"].astype(int),
+    })
+    records = pd.concat([load_records(), new_records], ignore_index=True)
+    records.to_csv(RECORD_FILE, index=False, encoding="utf-8-sig")
+
+
 st.title("買い物の記録")
 st.write("ここで、レシートの読み取りや、買い物の記録をします。")
+
+if "saved_message" in st.session_state:
+    st.success(st.session_state.pop("saved_message"))
 
 receipt = st.file_uploader("レシートの写真（JPG・PNG）", type=["jpg", "jpeg", "png"])
 if receipt is not None:
@@ -144,3 +169,17 @@ if "receipt_rows" in st.session_state:
         st.session_state["editor_version"] += 1
         st.rerun()
     st.write(f"合計：{int(edited['値段'].sum()):,}円")
+
+    if st.button("記録する", type="primary"):
+        rows = st.session_state["receipt_rows"]
+        if rows.empty:
+            st.warning("記録する商品がありません。表に行を足してください。")
+        elif rows["商品"].isna().any() or (rows["商品"] == "").any() or rows["値段"].isna().any():
+            st.warning("商品か値段が空の行があります。入れるか、その行を消してください。")
+        else:
+            save_records(st.session_state["receipt_date"], st.session_state["receipt_store"], rows)
+            st.session_state.pop("receipt_rows")
+            st.session_state["saved_message"] = f"{len(rows)}件を記録しました。"
+            st.rerun()
+
+st.caption(f"これまでの記録：{len(load_records())}件")
