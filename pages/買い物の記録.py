@@ -216,4 +216,9 @@ else:
         st.session_state["saved_message"] = f"{len(selected)}件の記録を消しました。"
         st.rerun()
 
+    st.subheader("区分ごとの合計（今月）")
+    totals = this_month.groupby("区分")["値段"].sum().reindex(category_order, fill_value=0)
+    st.table(pd.DataFrame({"合計": [f"{total:,}円" for total in totals]}, index=totals.index))
+    st.write(f"今月の合計：{this_month['値段'].sum():,}円")
+
 st.caption(f"これまでの記録：{len(load_records())}件")
