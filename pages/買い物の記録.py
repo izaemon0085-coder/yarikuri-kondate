@@ -1,4 +1,51 @@
+import base64
+import io
+
+import anthropic
+import pandas as pd
 import streamlit as st
+from dotenv import load_dotenv
+from PIL import Image
+from pydantic import BaseModel
+
+load_dotenv()
+client = anthropic.Anthropic()
+
+
+class ReceiptItem(BaseModel):
+    name: str
+    price: int
+
+
+class Receipt(BaseModel):
+    date: str
+    store: str
+    items: list[ReceiptItem]
+
+
+def read_receipt(file):
+    image = Image.open(file).convert("RGB")
+    image.thumbnail((2000, 2000))
+    buffer = io.BytesIO()
+    image.save(buffer, format="JPEG", quality=90)
+    image_data = base64.standard_b64encode(buffer.getvalue()).decode("utf-8")
+
+    response = client.beta.messages.parse(
+        model="claude-opus-5-5",
+        max_tokens=16000,
+        betas=["server-side-fallback-2026-07-01"],
+        fallbacks="default",
+        messages=[{
+            "role": "user",
+            "content": [
+                {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": image_data}},
+                {"type": "text", "text": "このレシートを読んでください。date は買った日（例：2026-10-14。わからないときは空）、store はお店の名前、items は買った商品です。商品ごとに、name は商品名、price は値段（円、数字だけ）です。値引きがあるときは、値引きしたあとの値段にしてください。小計・合計・消費税・お預り・お釣りは items に入れないでください。"},
+            ],
+        }],
+        output_format=Receipt,
+    )
+    return response.parsed_output
+
 
 st.title("買い物の記録")
 st.write("ここで、レシートの読み取りや、買い物の記録をします。")
@@ -6,6 +53,14 @@ st.write("ここで、レシートの読み取りや、買い物の記録をし�
 receipt = st.file_uploader("レシートの写真（JPG・PNG）", type=["jpg", "jpeg", "png"])
 if receipt is not None:
     st.image(receipt, caption=receipt.name, width=300)
-
-
-
+    if st.button("レシートを読み取る"):
+        with st.spinner("AIがレシートを読んでいます…"):
+            try:
+                result = read_receipt(receipt)
+            except anthropic.APIError:
+                result = None
+                st.error("レシートを読み取れませんでした。少し待ってから、もう一度試してください。")
+        if result is not None:
+            st.write(f"日付：{result.date}　お店：{result.store}")
+            rows = [{"商品": item.name, "値段": item.price} for item in result.items]
+            st.table(pd.DataFrame(rows))       
