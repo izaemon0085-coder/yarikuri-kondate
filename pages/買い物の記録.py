@@ -1,4 +1,5 @@
 import base64
+import calendar
 import datetime
 import io
 from pathlib import Path
@@ -225,5 +226,24 @@ else:
     store_totals = this_month["値段"].groupby(store_names).sum().sort_values(ascending=False)
     st.table(pd.DataFrame({"合計": [f"{total:,}円" for total in store_totals]}, index=store_totals.index.rename("お店")))
     st.write(f"今月の合計：{this_month['値段'].sum():,}円")
+
+st.divider()
+st.subheader("食費の予算（今月）")
+budget = st.number_input("1か月の食費の予算（円）", min_value=0, step=1000, value=None, placeholder="例：50000")
+food_total = int(this_month.loc[this_month["区分"].isin(["食材", "飲み物"]), "値段"].sum())
+if budget is None:
+    st.info("予算を入れると、残りの金額が出ます。")
+else:
+    remaining = budget - food_total
+    today = datetime.date.today()
+    days_left = calendar.monthrange(today.year, today.month)[1] - today.day + 1
+    column1, column2, column3 = st.columns(3)
+    column1.metric("予算", f"{budget:,}円")
+    column2.metric("使った食費（食材＋飲み物）", f"{food_total:,}円")
+    column3.metric("残り", f"{remaining:,}円")
+    if remaining >= 0:
+        st.write(f"今月はあと{days_left}日です。1日あたり、約{remaining // days_left:,}円 使えます。")
+    else:
+        st.write(f"予算を{-remaining:,}円 こえています。今月はあと{days_left}日です。")
 
 st.caption(f"これまでの記録：{len(load_records())}件")
