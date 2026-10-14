@@ -7,4 +7,5 @@ pages = [
 ]
 page = st.navigation(pages)
 st.set_page_config(page_title=f"{page.title}｜やりくり献立", page_icon="🍚")
+st.logo("images/logo_nikukyu.png", size="large")
 page.run()
