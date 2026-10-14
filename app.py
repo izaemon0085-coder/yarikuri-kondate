@@ -214,6 +214,21 @@ if st.button("献立を作る"):
         with tab:
             st.table(pd.DataFrame(week).set_index("日付"))
 
-    st.subheader("どのお店で何を買うと安いか")
-    shopping_rows = [{"お店": s.store, "買うもの": s.item, "理由": s.reason} for s in plan.shopping]
-    st.table(pd.DataFrame(shopping_rows).set_index("お店"))
+    st.subheader("お店ごとの買い物リスト")
+    if not plan.shopping:
+        st.info("買い物リストはありません。")
+    else:
+        store_names = []
+        for s in plan.shopping:
+            if s.store not in store_names:
+                store_names.append(s.store)
+
+        columns = st.columns(len(store_names))
+        for column, store_name in zip(columns, store_names):
+            with column:
+                with st.container(border=True):
+                    st.markdown(f"**{store_name}**")
+                    for s in plan.shopping:
+                        if s.store == store_name:
+                            st.write(f"・{s.item}")
+                            st.caption(s.reason)
