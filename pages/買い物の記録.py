@@ -1,5 +1,6 @@
 import base64
 import io
+from typing import Literal
 
 import anthropic
 import pandas as pd
@@ -14,7 +15,9 @@ client = anthropic.Anthropic()
 
 class ReceiptItem(BaseModel):
     name: str
+    reading: str
     price: int
+    category: Literal["食材", "飲み物", "お酒", "お菓子", "日用品", "その他"]
 
 
 class Receipt(BaseModel):
@@ -39,7 +42,7 @@ def read_receipt(file):
             "role": "user",
             "content": [
                 {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": image_data}},
-                {"type": "text", "text": "このレシートを読んでください。date は買った日（例：2026-10-14。わからないときは空）、store はお店の名前、items は買った商品です。商品ごとに、name は商品名、price は値段（円、数字だけ）です。値引きがあるときは、値引きしたあとの値段にしてください。小計・合計・消費税・お預り・お釣りは items に入れないでください。"},
+                {"type": "text", "text": "このレシートを読んでください。date は買った日（例：2026-10-14。わからないときは空）、store はお店の名前、items は買った商品です。商品ごとに、name は商品名、reading は商品名のよみがな（ひらがな）、price は値段（円、数字だけ）、category は区分です。区分は、料理に使うものは「食材」、お茶・ジュース・水などは「飲み物」（牛乳は料理にも使うので「食材」）、ビール・酒は「お酒」、おやつは「お菓子」、洗剤・ティッシュなどは「日用品」、どれにも当てはまらないものは「その他」にしてください。値引きがあるときは、値引きしたあとの値段にしてください。小計・合計・消費税・お預り・お釣りは items に入れないでください。"},
             ],
         }],
         output_format=Receipt,
@@ -62,5 +65,5 @@ if receipt is not None:
                 st.error("レシートを読み取れませんでした。少し待ってから、もう一度試してください。")
         if result is not None:
             st.write(f"日付：{result.date}　お店：{result.store}")
-            rows = [{"商品": item.name, "値段": item.price} for item in result.items]
-            st.table(pd.DataFrame(rows))       
+            rows = [{"区分": item.category, "商品": item.name, "よみがな": item.reading, "値段": item.price} for item in result.items]
+            st.table(pd.DataFrame(rows))
