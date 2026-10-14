@@ -15,6 +15,7 @@ client = anthropic.Anthropic()
 
 CATEGORIES = ["食材", "飲み物", "お酒", "お菓子", "日用品", "その他"]
 SORT_ORDERS = ["レシートの順", "あいうえお順", "区分ごと", "値段の高い順", "値段の安い順"]
+COLUMNS = ["順番", "区分", "商品", "よみがな", "値段"]
 
 
 class ReceiptItem(BaseModel):
@@ -70,6 +71,25 @@ def sort_rows(rows, order, category_order):
     return rows
 
 
+def set_receipt(date, store, rows):
+    st.session_state["receipt_date"] = date
+    st.session_state["receipt_store"] = store
+    st.session_state["receipt_rows"] = pd.DataFrame(rows, columns=COLUMNS)
+    st.session_state["editor_version"] = st.session_state.get("editor_version", 0) + 1
+
+
+def fill_new_rows(rows):
+    rows = rows.copy()
+    last_number = rows["順番"].max()
+    if pd.isna(last_number):
+        last_number = 0
+    rows["順番"] = rows["順番"].fillna(last_number + 1)
+    rows["よみがな"] = rows["よみがな"].fillna("")
+    no_reading = rows["よみがな"] == ""
+    rows.loc[no_reading, "よみがな"] = rows.loc[no_reading, "商品"].fillna("")
+    return rows
+
+
 st.title("買い物の記録")
 st.write("ここで、レシートの読み取りや、買い物の記録をします。")
 
@@ -88,16 +108,17 @@ if receipt is not None:
             st.warning("レシートが見つかりませんでした。お店のレシートの写真か確認してください。")
         elif result is not None:
             try:
-                st.session_state["receipt_date"] = datetime.date.fromisoformat(result.date)
+                receipt_date = datetime.date.fromisoformat(result.date)
             except ValueError:
-                st.session_state["receipt_date"] = datetime.date.today()
-            st.session_state["receipt_store"] = result.store
+                receipt_date = datetime.date.today()
             rows = [{"順番": number, "区分": item.category, "商品": item.name, "よみがな": item.reading, "値段": item.price} for number, item in enumerate(result.items, start=1)]
-            st.session_state["receipt_rows"] = pd.DataFrame(rows)
-            st.session_state["editor_version"] = st.session_state.get("editor_version", 0) + 1
+            set_receipt(receipt_date, result.store, rows)
+
+if st.button("写真なしで、新しく手で入力する"):
+    set_receipt(datetime.date.today(), "", [])
 
 if "receipt_rows" in st.session_state:
-    st.subheader("読み取った結果（直せます）")
+    st.subheader("買い物の内容（直せます）")
     st.date_input("日付", key="receipt_date")
     st.text_input("お店", key="receipt_store")
     order = st.selectbox("並べ方", SORT_ORDERS)
@@ -108,16 +129,18 @@ if "receipt_rows" in st.session_state:
     edited = st.data_editor(
         rows,
         column_config={
-            "区分": st.column_config.SelectboxColumn("区分", options=CATEGORIES, required=True),
+            "区分": st.column_config.SelectboxColumn("区分", options=CATEGORIES, required=True, default="食材"),
             "値段": st.column_config.NumberColumn("値段", min_value=0, step=1, format="%d円"),
         },
         column_order=["区分", "商品", "よみがな", "値段"],
         hide_index=True,
+        num_rows="dynamic",
         key=editor_key,
     )
+    st.caption("表の下の「＋」で行を足せます。よみがなが空なら、商品名が入ります（あとで直せます）。")
     changes = st.session_state[editor_key]
-    if changes["edited_rows"]:
-        st.session_state["receipt_rows"] = edited
+    if changes["edited_rows"] or changes["added_rows"] or changes["deleted_rows"]:
+        st.session_state["receipt_rows"] = fill_new_rows(edited)
         st.session_state["editor_version"] += 1
         st.rerun()
-    st.write(f"合計：{edited['値段'].sum():,}円")
+    st.write(f"合計：{int(edited['値段'].sum()):,}円")
