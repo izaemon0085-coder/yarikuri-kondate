@@ -54,12 +54,12 @@ def read_receipt(file):
     return response.parsed_output
 
 
-def sort_rows(rows, order):
+def sort_rows(rows, order, category_order):
     rows = rows.sort_values("順番")
     if order == "あいうえお順":
         return rows.sort_values("よみがな", kind="stable")
     if order == "区分ごと":
-        return rows.sort_values("区分", key=lambda column: column.map(CATEGORIES.index), kind="stable")
+        return rows.sort_values("区分", key=lambda column: column.map(category_order.index), kind="stable")
     if order == "値段の高い順":
         return rows.sort_values("値段", ascending=False, kind="stable")
     if order == "値段の安い順":
@@ -95,7 +95,9 @@ if "receipt_rows" in st.session_state:
     st.date_input("日付", key="receipt_date")
     st.text_input("お店", key="receipt_store")
     order = st.selectbox("並べ方", SORT_ORDERS)
-    rows = sort_rows(st.session_state["receipt_rows"], order)
+    chosen = st.multiselect("区分の順番（「区分ごと」のとき、選んだ順に並びます）", CATEGORIES, default=CATEGORIES)
+    category_order = chosen + [category for category in CATEGORIES if category not in chosen]
+    rows = sort_rows(st.session_state["receipt_rows"], order, category_order)
     editor_key = f"receipt_editor_{st.session_state['editor_version']}"
     edited = st.data_editor(
         rows,
