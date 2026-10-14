@@ -34,6 +34,16 @@ class Receipt(BaseModel):
     items: list[ReceiptItem]
 
 
+class Idea(BaseModel):
+    title: str
+    detail: str
+    saving: int
+
+
+class IdeaList(BaseModel):
+    ideas: list[Idea]
+
+
 def read_receipt(file):
     image = Image.open(file).convert("RGB")
     image.thumbnail((2000, 2000))
@@ -59,6 +69,21 @@ def read_receipt(file):
     if result is None:
         return Receipt(date="", store="", items=[])
     return result
+
+
+def ask_ideas(prompt):
+    response = client.beta.messages.parse(
+        model="claude-opus-5-5",
+        max_tokens=16000,
+        betas=["server-side-fallback-2026-07-01"],
+        fallbacks="default",
+        messages=[{"role": "user", "content": prompt}],
+        output_format=IdeaList,
+    )
+    result = response.parsed_output
+    if result is None:
+        return []
+    return result.ideas
 
 
 def sort_rows(rows, order, category_order):
@@ -236,7 +261,8 @@ if budget is None:
 else:
     remaining = budget - food_total
     today = datetime.date.today()
-    days_left = calendar.monthrange(today.year, today.month)[1] - today.day + 1
+    days_in_month = calendar.monthrange(today.year, today.month)[1]
+    days_left = days_in_month - today.day + 1
     column1, column2, column3 = st.columns(3)
     column1.metric("予算", f"{budget:,}円")
     column2.metric("使った食費（食材＋飲み物）", f"{food_total:,}円")
@@ -245,5 +271,50 @@ else:
         st.write(f"今月はあと{days_left}日です。1日あたり、約{remaining // days_left:,}円 使えます。")
     else:
         st.write(f"予算を{-remaining:,}円 こえています。今月はあと{days_left}日です。")
+
+    projected = food_total * days_in_month // today.day
+    if projected <= budget:
+        st.write(f"このままのペースだと、月末の食費は約{projected:,}円です。予算内におさまりそうです。")
+    else:
+        st.write(f"このままのペースだと、月末の食費は約{projected:,}円です。予算を少しこえそうです。")
+        if st.button("安く済ませる案を、AIに聞く"):
+            food_rows = this_month[this_month["区分"].isin(["食材", "飲み物"])]
+            lines = ""
+            for _, row in food_rows.iterrows():
+                lines += f"  - {row['日付']} {row['お店']} {row['商品']} {row['値段']}円\n"
+            prompt = f"""あなたは、家庭料理と食費の節約が得意なアドバイザーです。
+今月の食費が、予算をこえそうです。注意や警告ではなく、前向きで具体的な「代わりの案」を3つから5つ出してください。
+
+- 1か月の食費の予算：{budget}円
+- 今月使った食費：{food_total}円（今日まで{today.day}日間）
+- このままのペースだと、月末に：約{projected}円
+- 予算の残り：{remaining}円（今月はあと{days_left}日）
+- 今月買った食材と飲み物（日付 お店 商品 値段）：
+{lines}
+案は、次のようなものにしてください。
+- 高い食材を、安くて似た食材に置きかえる（例：鶏もも肉を鶏むね肉に）
+- 同じ商品がもっと安いお店があれば、そのお店で買う
+- 安い食材（もやし・豆腐・卵など）を使った料理を増やす
+上の記録にある値段は、そのまま使ってください。記録にない値段は、実際のスーパーの値段に近い金額にしてください。
+
+案ごとに、次の3つを答えてください。
+- title：案の短い見出し（例：鶏もも肉を鶏むね肉に）
+- detail：具体的なやり方（2〜3文）
+- saving：今月の残りの日で、だいたい何円安くなるか（円、数字だけ）"""
+            with st.spinner("AIが案を考えています…"):
+                try:
+                    ideas = ask_ideas(prompt)
+                except anthropic.APIError:
+                    ideas = None
+                    st.error("案を受け取れませんでした。少し待ってから、もう一度試してください。")
+            if ideas == []:
+                st.info("案が見つかりませんでした。もう一度試してください。")
+            elif ideas:
+                st.subheader("💡 安く済ませる案")
+                for idea in ideas:
+                    with st.container(border=True):
+                        st.markdown(f"**{idea.title}**")
+                        st.write(idea.detail)
+                        st.caption(f"今月の残りで、約{idea.saving:,}円 安くなります")
 
 st.caption(f"これまでの記録：{len(load_records())}件")
