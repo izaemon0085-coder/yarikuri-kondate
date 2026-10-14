@@ -98,6 +98,10 @@ def load_records():
     return pd.DataFrame(columns=["日付", "お店", "区分", "商品", "よみがな", "値段"])
 
 
+def write_records(records):
+    records.to_csv(RECORD_FILE, index=False, encoding="utf-8-sig")
+
+
 def save_records(date, store, rows):
     rows = rows.sort_values("順番")
     new_records = pd.DataFrame({
@@ -109,7 +113,7 @@ def save_records(date, store, rows):
         "値段": rows["値段"].astype(int),
     })
     records = pd.concat([load_records(), new_records], ignore_index=True)
-    records.to_csv(RECORD_FILE, index=False, encoding="utf-8-sig")
+    write_records(records)
 
 
 st.title("買い物の記録")
@@ -117,6 +121,11 @@ st.write("ここで、レシートの読み取りや、買い物の記録をし�
 
 if "saved_message" in st.session_state:
     st.success(st.session_state.pop("saved_message"))
+
+st.sidebar.header("表の並べ方")
+order = st.sidebar.selectbox("並べ方", SORT_ORDERS)
+chosen = st.sidebar.multiselect("区分の順番（「区分ごと」のとき、選んだ順に並びます）", CATEGORIES, default=CATEGORIES)
+category_order = chosen + [category for category in CATEGORIES if category not in chosen]
 
 receipt = st.file_uploader("レシートの写真（JPG・PNG）", type=["jpg", "jpeg", "png"])
 if receipt is not None:
@@ -146,9 +155,6 @@ if "receipt_rows" in st.session_state:
     st.subheader("買い物の内容（直せます）")
     st.date_input("日付", key="receipt_date")
     st.text_input("お店", key="receipt_store")
-    order = st.selectbox("並べ方", SORT_ORDERS)
-    chosen = st.multiselect("区分の順番（「区分ごと」のとき、選んだ順に並びます）", CATEGORIES, default=CATEGORIES)
-    category_order = chosen + [category for category in CATEGORIES if category not in chosen]
     rows = sort_rows(st.session_state["receipt_rows"], order, category_order)
     editor_key = f"receipt_editor_{st.session_state['editor_version']}"
     edited = st.data_editor(
@@ -181,5 +187,33 @@ if "receipt_rows" in st.session_state:
             st.session_state.pop("receipt_rows")
             st.session_state["saved_message"] = f"{len(rows)}件を記録しました。"
             st.rerun()
+
+st.divider()
+st.subheader("今月の記録")
+records = load_records()
+this_month = records[records["日付"].str.startswith(datetime.date.today().strftime("%Y-%m"))]
+if this_month.empty:
+    st.info("今月の記録は、まだありません。")
+else:
+    month_rows = this_month.sort_values("日付", kind="stable")
+    month_rows = month_rows.assign(順番=range(len(month_rows)))
+    shown = sort_rows(month_rows, order, category_order)
+    table_key = f"records_table_{st.session_state.get('records_version', 0)}"
+    table = st.dataframe(
+        shown,
+        column_config={"値段": st.column_config.NumberColumn("値段", format="%d円")},
+        column_order=["日付", "お店", "区分", "商品", "値段"],
+        hide_index=True,
+        on_select="rerun",
+        selection_mode="multi-row",
+        key=table_key,
+    )
+    st.caption("消したい記録は、表の左はしをクリックして選んでください。")
+    selected = table.selection.rows
+    if st.button(f"選んだ記録を消す（{len(selected)}件）", disabled=not selected):
+        write_records(records.drop(shown.index[selected]))
+        st.session_state["records_version"] = st.session_state.get("records_version", 0) + 1
+        st.session_state["saved_message"] = f"{len(selected)}件の記録を消しました。"
+        st.rerun()
 
 st.caption(f"これまでの記録：{len(load_records())}件")
