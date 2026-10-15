@@ -3,6 +3,7 @@ from pathlib import Path
 import streamlit as st
 
 from themes import THEMES
+from user_settings import save_settings
 
 LOGO_NAMES = {
     "logo_nikukyu.png": "猫の肉球",
@@ -16,12 +17,18 @@ def logo_name(logo):
     return LOGO_NAMES.get(Path(logo).name, Path(logo).stem)
 
 
+def save():
+    save_settings({"logo": st.session_state["logo"], "color": st.session_state["color"]})
+
+
 def choose_logo():
     st.session_state["logo"] = st.session_state["logo_choice"]
+    save()
 
 
 def choose_color():
     st.session_state["color"] = st.session_state["color_choice"]
+    save()
 
 
 st.title("設定")
@@ -34,7 +41,7 @@ for column, logo in zip(columns, logos):
         st.image(logo, width=100)
         st.caption(logo_name(logo))
 
-current = st.session_state.get("logo", "images/logo_nikukyu.png")
+current = st.session_state["logo"]
 st.radio(
     "使うロゴ",
     logos,
@@ -54,7 +61,7 @@ for column, color in zip(columns, colors):
         st.markdown(f'<span style="color:{THEMES[color]["primaryColor"]}; font-size:2em;">●</span>', unsafe_allow_html=True)
         st.caption(color)
 
-current_color = st.session_state.get("color", "緑")
+current_color = st.session_state["color"]
 st.radio(
     "使う色",
     colors,
@@ -63,3 +70,4 @@ st.radio(
     key="color_choice",
     on_change=choose_color,
 )
+st.caption("選んだロゴと色は、次に起動したときも使われます。")
