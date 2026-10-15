@@ -1,4 +1,4 @@
-import base64
+
 import datetime
 import io
 
@@ -74,11 +74,16 @@ def read_flyer(file):
 
 
 st.title("やりくり献立")
+st.caption("予算と近所のスーパーの特売品から、AIが献立を考えます。")
 
-people = st.number_input("人数", min_value=1, max_value=10, value=None, placeholder="例：2")
-budget = st.number_input("1か月の食費の予算（円）", min_value=0, step=1000, value=None, placeholder="例：50000")
+st.subheader("1. 家族と予算")
+column1, column2 = st.columns(2)
+people = column1.number_input("人数", min_value=1, max_value=10, value=None, placeholder="例：2")
+budget = column2.number_input("1か月の食費の予算（円）", min_value=0, step=1000, value=None, placeholder="例：50000")
 dislikes = st.text_input("苦手な食材・アレルギー（例：えび、セロリ）")
 area = st.text_input("地域（例：東京都 世田谷区）")
+
+st.subheader("2. よく行くお店と特売品")
 store_count = st.number_input("よく行くお店の数", min_value=1, max_value=3, value=2)
 stores = []
 for i in range(1, store_count + 1):
@@ -105,8 +110,10 @@ for i in range(1, store_count + 1):
     items = [line.strip() for line in text.splitlines() if line.strip()]
     stores.append({"name": name or f"お店{i}", "items": items})
 
-period = st.radio("献立の期間", ["1日分", "1週間分", "1か月分"])
-start_date = st.date_input("献立を始める日", value=datetime.date.today())
+st.subheader("3. 献立の期間")
+column1, column2 = st.columns(2)
+period = column1.radio("献立の期間", ["1日分", "1週間分", "1か月分"])
+start_date = column2.date_input("献立を始める日", value=datetime.date.today())
 
 days = {"1日分": 1, "1週間分": 7, "1か月分": 30}[period]
 
@@ -231,4 +238,3 @@ if st.button("献立を作る"):
                     for s in plan.shopping:
                         if s.store == store_name:
                             st.write(f"・{s.item}")
-                            st.caption(s.reason)
