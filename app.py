@@ -11,7 +11,7 @@ pages = [
 page = st.navigation(pages)
 
 color = st.session_state.get("color", "緑")
-changed = Falsep
+changed = False
 for name, value in THEMES[color].items():
     if config.get_option(f"theme.{name}") != value:
         config.set_option(f"theme.{name}", value)
