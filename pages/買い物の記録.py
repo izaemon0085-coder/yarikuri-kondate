@@ -143,7 +143,7 @@ def save_records(date, store, rows):
 
 
 st.title("買い物の記録")
-st.write("ここで、レシートの読み取りや、買い物の記録をします。")
+st.caption("レシートの写真や手入力で、使った金額を記録します。今月の合計や、予算との比べ方も見られます。")
 
 if "saved_message" in st.session_state:
     st.success(st.session_state.pop("saved_message"))
@@ -153,6 +153,7 @@ order = st.sidebar.selectbox("並べ方", SORT_ORDERS)
 chosen = st.sidebar.multiselect("区分の順番（「区分ごと」のとき、選んだ順に並びます）", CATEGORIES, default=CATEGORIES)
 category_order = chosen + [category for category in CATEGORIES if category not in chosen]
 
+st.subheader("1. 買い物を入力する")
 receipt = st.file_uploader("レシートの写真（JPG・PNG）", type=["jpg", "jpeg", "png"])
 if receipt is not None:
     st.image(receipt, caption=receipt.name, width=300)
@@ -215,7 +216,7 @@ if "receipt_rows" in st.session_state:
             st.rerun()
 
 st.divider()
-st.subheader("今月の記録")
+st.subheader("2. 今月の記録")
 records = load_records()
 this_month = records[records["日付"].str.startswith(datetime.date.today().strftime("%Y-%m"))]
 if this_month.empty:
@@ -242,18 +243,22 @@ else:
         st.session_state["saved_message"] = f"{len(selected)}件の記録を消しました。"
         st.rerun()
 
-    st.subheader("区分ごとの合計（今月）")
-    totals = this_month.groupby("区分")["値段"].sum().reindex(category_order, fill_value=0)
-    st.table(pd.DataFrame({"合計": [f"{total:,}円" for total in totals]}, index=totals.index))
-
-    st.subheader("お店ごとの合計（今月）")
-    store_names = this_month["お店"].fillna("（お店の名前なし）")
-    store_totals = this_month["値段"].groupby(store_names).sum().sort_values(ascending=False)
-    st.table(pd.DataFrame({"合計": [f"{total:,}円" for total in store_totals]}, index=store_totals.index.rename("お店")))
-    st.write(f"今月の合計：{this_month['値段'].sum():,}円")
+    st.divider()
+    st.subheader("3. 今月の合計")
+    st.write(f"**今月の合計：{this_month['値段'].sum():,}円**")
+    column1, column2 = st.columns(2)
+    with column1:
+        st.markdown("**区分ごと**")
+        totals = this_month.groupby("区分")["値段"].sum().reindex(category_order, fill_value=0)
+        st.table(pd.DataFrame({"合計": [f"{total:,}円" for total in totals]}, index=totals.index))
+    with column2:
+        st.markdown("**お店ごと**")
+        store_names = this_month["お店"].fillna("（お店の名前なし）")
+        store_totals = this_month["値段"].groupby(store_names).sum().sort_values(ascending=False)
+        st.table(pd.DataFrame({"合計": [f"{total:,}円" for total in store_totals]}, index=store_totals.index.rename("お店")))
 
 st.divider()
-st.subheader("食費の予算（今月）")
+st.subheader("4. 食費の予算（今月）")
 budget = st.number_input("1か月の食費の予算（円）", min_value=0, step=1000, value=None, placeholder="例：50000")
 food_total = int(this_month.loc[this_month["区分"].isin(["食材", "飲み物"]), "値段"].sum())
 if budget is None:
