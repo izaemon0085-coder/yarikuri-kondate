@@ -44,6 +44,17 @@ class IdeaList(BaseModel):
     ideas: list[Idea]
 
 
+class Fix(BaseModel):
+    number: int
+    reading: str
+    category: Literal["食材", "飲み物", "お酒", "お菓子", "日用品", "その他"]
+    reason: str
+
+
+class FixList(BaseModel):
+    fixes: list[Fix]
+
+
 def read_receipt(file):
     image = Image.open(file).convert("RGB")
     image.thumbnail((2000, 2000))
@@ -84,6 +95,41 @@ def ask_ideas(prompt):
     if result is None:
         return []
     return result.ideas
+
+
+def check_items(rows):
+    rows = rows.reset_index(drop=True)
+    lines = ""
+    for number, row in rows.iterrows():
+        lines += f"  {number}: 商品「{row['商品']}」 よみがな「{row['よみがな']}」 区分「{row['区分']}」\n"
+    prompt = f"""あなたは、レシートの読み取り結果を確認する係です。
+下の表は、別のAIがレシートから読み取ったものです。一つずつ、よみがなと区分が正しいか確認してください。
+
+- よみがな：商品名のひらがなの読み方が合っているか（例：牛乳→ぎゅうにゅう）
+- 区分：食材・飲み物・お酒・お菓子・日用品・その他 のどれが合っているか
+    料理に使うものは「食材」、お茶・ジュース・水などは「飲み物」（牛乳は料理にも使うので「食材」）、
+    ビール・酒は「お酒」、おやつは「お菓子」、洗剤・ティッシュなどは「日用品」、
+    どれにも当てはまらないものは「その他」です。
+
+読み取り結果：
+{lines}
+直したほうがよい商品だけを、fixes に入れてください。合っている商品は入れないでください。
+- number：その商品の番号（上の表の番号）
+- reading：正しいよみがな（ひらがな）
+- category：正しい区分
+- reason：なぜ直すとよいか（短く）"""
+    response = client.beta.messages.parse(
+        model="claude-opus-5-5",
+        max_tokens=16000,
+        betas=["server-side-fallback-2026-07-01"],
+        fallbacks="default",
+        messages=[{"role": "user", "content": prompt}],
+        output_format=FixList,
+    )
+    result = response.parsed_output
+    if result is None:
+        return []
+    return [fix for fix in result.fixes if 0 <= fix.number < len(rows)]
 
 
 def sort_rows(rows, order, category_order):
