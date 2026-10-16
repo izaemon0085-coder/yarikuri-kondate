@@ -275,6 +275,15 @@ if "receipt_rows" in st.session_state:
                     if row["区分"] != fix.category:
                         st.write(f"区分：{row['区分']} → **{fix.category}**")
                     st.caption(fix.reason)
+            if st.button("直しをまとめて反映する"):
+                for fix in fixes:
+                    base.loc[fix.number, "よみがな"] = fix.reading
+                    base.loc[fix.number, "区分"] = fix.category
+                st.session_state["receipt_rows"] = base
+                st.session_state["editor_version"] += 1
+                st.session_state.pop("fixes", None)
+                st.session_state["saved_message"] = f"{len(fixes)}件の直しを反映しました。"
+                st.rerun()
 
     if st.button("記録する", type="primary"):
         rows = st.session_state["receipt_rows"]
