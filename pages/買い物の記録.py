@@ -265,6 +265,16 @@ if "receipt_rows" in st.session_state:
             st.success("確認役AIのチェック：直したほうがよいところは、見つかりませんでした。")
         else:
             st.warning(f"確認役AIが、{len(fixes)}件、直したほうがよいところを見つけました。")
+            base = st.session_state["receipt_rows"].sort_values("順番").reset_index(drop=True)
+            for fix in fixes:
+                row = base.iloc[fix.number]
+                with st.container(border=True):
+                    st.markdown(f"**{row['商品']}**")
+                    if row["よみがな"] != fix.reading:
+                        st.write(f"よみがな：{row['よみがな']} → **{fix.reading}**")
+                    if row["区分"] != fix.category:
+                        st.write(f"区分：{row['区分']} → **{fix.category}**")
+                    st.caption(fix.reason)
 
     if st.button("記録する", type="primary"):
         rows = st.session_state["receipt_rows"]
