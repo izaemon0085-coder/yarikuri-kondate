@@ -246,8 +246,25 @@ if "receipt_rows" in st.session_state:
     if changes["edited_rows"] or changes["added_rows"] or changes["deleted_rows"]:
         st.session_state["receipt_rows"] = fill_new_rows(edited)
         st.session_state["editor_version"] += 1
+        st.session_state.pop("fixes", None)
         st.rerun()
     st.write(f"合計：{int(edited['値段'].sum()):,}円")
+
+    if st.button("確認役AIにチェックしてもらう"):
+        base = st.session_state["receipt_rows"].sort_values("順番").reset_index(drop=True)
+        with st.spinner("確認役AIがチェックしています…"):
+            try:
+                st.session_state["fixes"] = check_items(base)
+            except anthropic.APIError:
+                st.error("チェックできませんでした。少し待ってから、もう一度試してください。")
+        st.rerun()
+
+    if "fixes" in st.session_state:
+        fixes = st.session_state["fixes"]
+        if not fixes:
+            st.success("確認役AIのチェック：直したほうがよいところは、見つかりませんでした。")
+        else:
+            st.warning(f"確認役AIが、{len(fixes)}件、直したほうがよいところを見つけました。")
 
     if st.button("記録する", type="primary"):
         rows = st.session_state["receipt_rows"]
